@@ -1,6 +1,6 @@
 {
-  "name": "Facilitation Toolkit",
-  "short_name": "Facil Toolkit",
+  "name": "FaciToolkit",
+  "short_name": "FaciToolkit",
   "description": "Find the right icebreaker or energizer for any workshop — in seconds.",
   "start_url": "/",
   "display": "standalone",
