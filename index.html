@@ -24,8 +24,17 @@
   </script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #fefff1; font-family: 'DM Sans', 'Segoe UI', sans-serif; }
-    button { outline: none; -webkit-tap-highlight-color: transparent; }
+    body { background: #F2F2F2; font-family: 'DM Sans', 'Segoe UI', sans-serif; font-size: 16px; line-height: 1.5; }
+    /* WCAG: visible focus rings on all interactive elements */
+    button:focus-visible, a:focus-visible, select:focus-visible {
+      outline: 3px solid #42708C;
+      outline-offset: 2px;
+    }
+    button { -webkit-tap-highlight-color: transparent; }
+    /* WCAG: respect reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
     @media print { .no-print { display: none !important; } }
   </style>
 </head>
@@ -34,25 +43,46 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-
 function useGlobalStyles() {
   useEffect(() => {
     const style = document.createElement("style");
-    style.textContent = `* { -webkit-tap-highlight-color: transparent; } button { -webkit-tap-highlight-color: transparent; outline: none; } @media print { .no-print { display: none !important; } }`;
+    style.textContent = `* { -webkit-tap-highlight-color: transparent; } @media print { .no-print { display: none !important; } }`;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
   }, []);
 }
 
+// Android install prompt
+function useInstallPrompt() {
+  const [prompt, setPrompt] = useState(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+  useEffect(() => {
+    const handler = (e) => { e.preventDefault(); setPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', () => setIsInstalled(true));
+    if (window.matchMedia('(display-mode: standalone)').matches) setIsInstalled(true);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+  const install = async () => {
+    if (!prompt) return;
+    prompt.prompt();
+    const { outcome } = await prompt.userChoice;
+    if (outcome === 'accepted') setIsInstalled(true);
+    setPrompt(null);
+  };
+  return { canInstall: !!prompt && !isInstalled, install };
+}
+
 const C = {
   red:"#F25A38",teal:"#42708C",cream:"#F2F2F2",dark:"#1a1a1a",mid:"#4a4a4a",
-  muted:"#8a8a8a",border:"#d8d8d8",redLight:"#fdecea",tealLight:"#dce8ef",
+  // WCAG fix: #8a8a8a on #F2F2F2 = 2.8:1 — bumped to #767676 = 4.54:1
+  muted:"#767676",border:"#d8d8d8",redLight:"#fdecea",tealLight:"#dce8ef",
   redBg:"#F25A3818",tealBg:"#42708C18",
 };
 
 const T = {
   en: {
-    back:"← Back", appTitle:"📢 Facilitation Toolkit",
+    back:"← Back", appTitle:"📢 FaciToolkit",
     headline1:"Find your next", headline2:"icebreaker", headline3:"or", headline4:"energizer",
     filterTitle:"Tell us what you need!", filterSub:"Answer 5 quick questions → get the most relevant activities", filterTag:"Recommended",
     browseTitle:"Browse all", browseSub:(n)=>`Explore all ${n} activities freely`,
@@ -61,13 +91,17 @@ const T = {
     allActivities:"All Activities", all:(n)=>`All (${n})`, icebreakers:(n)=>`Icebreakers (${n})`, energizers:(n)=>`Energizers (${n})`,
     anySize:"Any", activities:(n)=>`${n} activit${n===1?"y":"ies"}`,
     noMatch:"No activities match these filters.", noMatchResults:"No matches",
-    tapToSee:"Tap any card to see full instructions", adjustFilters:"Try adjusting your filters", adjustBtn:"Adjust filters", nearestMatch:"⚠️ No exact match — showing closest activities",
+    tapToSee:"Tap any card to see full instructions", adjustFilters:"Try adjusting your filters", adjustBtn:"Adjust filters",
+    nearestMatch:"⚠️ No exact match — showing closest activities",
     onlineOK:"💻 Online OK", howToRun:"How to run it", facilScript:"Facilitator script", facilTip:"Facilitator tip", outcome:"Expected outcome",
-    copy:"📋 Copy", copied:"✅ Copied!", savePDF:"🖨️ Save as PDF", close:"Close", print:"Print / Save as PDF",
+    share:"Share this activity",
+    close:"Close",
     skipFilters:"Skip remaining filters →", favEmpty:"Your favourites will appear here.",
     favNone:"No favourites yet — tap the heart on any activity to save it here.",
     saved:(n)=>`${n} saved activit${n===1?"y":"ies"}`, myFavourites:"❤️ My favourites",
     step:(a,b)=>`Step ${a} of ${b}`, people:"people", min:"min", materials:"Materials",
+    addToHome:"Add to home screen", addToHomeSub:"Install FaciToolkit for quick access",
+    toggleFavAdd:"Save to favourites", toggleFavRemove:"Remove from favourites",
     q1:"How many participants?", q1o:[{value:"5",label:"Up to 5",sub:"Very small"},{value:"15",label:"6–15",sub:"Small group"},{value:"30",label:"16–30",sub:"Medium group"},{value:"60",label:"31+",sub:"Large group"}],
     q2:"Do participants know each other?", q2o:[{value:"strangers",label:"Complete strangers",sub:"First time meeting"},{value:"acquaintances",label:"Met briefly",sub:"Know each other a little"},{value:"colleagues",label:"Know each other well",sub:"Regular team"}],
     q3:"What is the main goal?", q3o:[{value:"get-to-know",label:"Get to know each other",sub:"👋"},{value:"energy",label:"Boost the level of energy",sub:"⚡"}],
@@ -75,7 +109,7 @@ const T = {
     q5:"What is your space like?", q5o:[{value:"seated",label:"Seated — can't move",sub:"Restaurant, tight classroom"},{value:"limited",label:"Meeting room",sub:"Can stand and move a little"},{value:"open",label:"Open space",sub:"Venue, hall — room to move"},{value:"online",label:"Online / virtual",sub:"Zoom, Teams, etc."}],
   },
   fr: {
-    back:"← Retour", appTitle:"📢 Facilitation Toolkit",
+    back:"← Retour", appTitle:"📢 FaciToolkit",
     headline1:"Trouvez votre prochain", headline2:"brise-glace", headline3:"ou", headline4:"énergisant",
     filterTitle:"Dites-nous ce qu'il vous faut !", filterSub:"Répondez à 5 questions → obtenez les activités les plus pertinentes", filterTag:"Recommandé",
     browseTitle:"Tout parcourir", browseSub:(n)=>`Explorer librement les ${n} activités`,
@@ -84,13 +118,17 @@ const T = {
     allActivities:"Toutes les activités", all:(n)=>`Tout (${n})`, icebreakers:(n)=>`Brise-glaces (${n})`, energizers:(n)=>`Énergisants (${n})`,
     anySize:"Tous", activities:(n)=>`${n} activité${n>1?"s":""}`,
     noMatch:"Aucune activité ne correspond à ces filtres.", noMatchResults:"Aucun résultat",
-    tapToSee:"Appuyez sur une carte pour voir les instructions complètes", adjustFilters:"Essayez de modifier vos filtres", adjustBtn:"Modifier les filtres", nearestMatch:"⚠️ Pas de résultat exact — voici les activités les plus proches",
+    tapToSee:"Appuyez sur une carte pour voir les instructions complètes", adjustFilters:"Essayez de modifier vos filtres", adjustBtn:"Modifier les filtres",
+    nearestMatch:"⚠️ Pas de résultat exact — voici les activités les plus proches",
     onlineOK:"💻 En ligne OK", howToRun:"Comment animer", facilScript:"Script du facilitateur", facilTip:"Conseil du facilitateur", outcome:"Résultat attendu",
-    copy:"📋 Copier", copied:"✅ Copié !", savePDF:"🖨️ Enregistrer en PDF", close:"Fermer", print:"Imprimer / Enregistrer en PDF",
+    share:"Partager cette activité",
+    close:"Fermer",
     skipFilters:"Passer les filtres restants →", favEmpty:"Vos favoris apparaîtront ici.",
     favNone:"Pas encore de favoris — appuyez sur le coeur d'une activité pour la sauvegarder.",
     saved:(n)=>`${n} activité${n>1?"s":""} sauvegardée${n>1?"s":""}`, myFavourites:"❤️ Mes favoris",
     step:(a,b)=>`Étape ${a} sur ${b}`, people:"personnes", min:"min", materials:"Matériel",
+    addToHome:"Ajouter à l'écran d'accueil", addToHomeSub:"Installer FaciToolkit pour un accès rapide",
+    toggleFavAdd:"Sauvegarder en favori", toggleFavRemove:"Retirer des favoris",
     q1:"Combien de participants ?", q1o:[{value:"5",label:"Jusqu'à 5",sub:"Très petit groupe"},{value:"15",label:"6–15",sub:"Petit groupe"},{value:"30",label:"16–30",sub:"Groupe moyen"},{value:"60",label:"31+",sub:"Grand groupe"}],
     q2:"Les participants se connaissent-ils ?", q2o:[{value:"strangers",label:"Parfaits inconnus",sub:"Première rencontre"},{value:"acquaintances",label:"Se connaissent un peu",sub:"Quelques interactions"},{value:"colleagues",label:"Se connaissent bien",sub:"Équipe régulière"}],
     q3:"Quel est l'objectif principal ?", q3o:[{value:"get-to-know",label:"Apprendre à se connaître",sub:"👋"},{value:"energy",label:"Booster le niveau d'énergie",sub:"⚡"}],
@@ -98,7 +136,7 @@ const T = {
     q5:"Quel est votre espace ?", q5o:[{value:"seated",label:"Assis — sans bouger",sub:"Restaurant, salle de classe"},{value:"limited",label:"Salle de réunion",sub:"Peut se lever et bouger un peu"},{value:"open",label:"Espace ouvert",sub:"Salle de conférence, hall"},{value:"online",label:"En ligne / virtuel",sub:"Zoom, Teams, etc."}],
   },
   vi: {
-    back:"← Quay lại", appTitle:"📢 Facilitation Toolkit",
+    back:"← Quay lại", appTitle:"📢 FaciToolkit",
     headline1:"Tìm hoạt động tiếp theo", headline2:"phá băng", headline3:"hoặc", headline4:"tiếp năng lượng",
     filterTitle:"Bạn cần gì?", filterSub:"Trả lời 5 câu hỏi → nhận các hoạt động phù hợp nhất", filterTag:"Đề xuất",
     browseTitle:"Xem tất cả", browseSub:(n)=>`Khám phá tự do ${n} hoạt động`,
@@ -107,13 +145,17 @@ const T = {
     allActivities:"Tất cả hoạt động", all:(n)=>`Tất cả (${n})`, icebreakers:(n)=>`Phá băng (${n})`, energizers:(n)=>`Tiếp năng lượng (${n})`,
     anySize:"Tất cả", activities:(n)=>`${n} hoạt động`,
     noMatch:"Không có hoạt động nào phù hợp.", noMatchResults:"Không có kết quả",
-    tapToSee:"Nhấn vào thẻ để xem hướng dẫn đầy đủ", adjustFilters:"Thử điều chỉnh bộ lọc", adjustBtn:"Điều chỉnh bộ lọc", nearestMatch:"⚠️ Không có kết quả chính xác — đây là các hoạt động gần nhất",
+    tapToSee:"Nhấn vào thẻ để xem hướng dẫn đầy đủ", adjustFilters:"Thử điều chỉnh bộ lọc", adjustBtn:"Điều chỉnh bộ lọc",
+    nearestMatch:"⚠️ Không có kết quả chính xác — đây là các hoạt động gần nhất",
     onlineOK:"💻 Trực tuyến OK", howToRun:"Cách thực hiện", facilScript:"Kịch bản người dẫn", facilTip:"Mẹo người dẫn", outcome:"Kết quả mong đợi",
-    copy:"📋 Sao chép", copied:"✅ Đã sao chép!", savePDF:"🖨️ Lưu PDF", close:"Đóng", print:"In / Lưu PDF",
+    share:"Chia sẻ hoạt động này",
+    close:"Đóng",
     skipFilters:"Bỏ qua bộ lọc còn lại →", favEmpty:"Danh sách yêu thích sẽ xuất hiện ở đây.",
     favNone:"Chưa có yêu thích — nhấn trái tim để lưu hoạt động.",
     saved:(n)=>`Đã lưu ${n} hoạt động`, myFavourites:"❤️ Yêu thích",
     step:(a,b)=>`Bước ${a} / ${b}`, people:"người", min:"phút", materials:"Dụng cụ",
+    addToHome:"Thêm vào màn hình chính", addToHomeSub:"Cài FaciToolkit để truy cập nhanh",
+    toggleFavAdd:"Lưu vào yêu thích", toggleFavRemove:"Xóa khỏi yêu thích",
     q1:"Có bao nhiêu người tham gia?", q1o:[{value:"5",label:"Tối đa 5",sub:"Nhóm rất nhỏ"},{value:"15",label:"6–15",sub:"Nhóm nhỏ"},{value:"30",label:"16–30",sub:"Nhóm trung bình"},{value:"60",label:"31+",sub:"Nhóm lớn"}],
     q2:"Người tham gia có quen nhau không?", q2o:[{value:"strangers",label:"Hoàn toàn xa lạ",sub:"Lần đầu gặp mặt"},{value:"acquaintances",label:"Biết nhau sơ sơ",sub:"Đã gặp vài lần"},{value:"colleagues",label:"Quen biết nhau",sub:"Nhóm thường xuyên"}],
     q3:"Mục tiêu chính là gì?", q3o:[{value:"get-to-know",label:"Làm quen với nhau",sub:"👋"},{value:"energy",label:"Tăng năng lượng",sub:"⚡"}],
@@ -139,7 +181,6 @@ const TYPE_LABEL={
   fr:{Icebreaker:"Brise-glace",Energizer:"Énergisant"},
   vi:{Icebreaker:"Phá băng",Energizer:"Tiếp năng lượng"},
 };
-const STORAGE_KEY="movers_favourites";
 
 const EN_ACTIVITIES = [
   {id:9,name:"Power 8",type:"Energizer",minPeople:15,maxPeople:200,duration:4,objective:["energy"],familiarity:["strangers","acquaintances","colleagues"],energy:"high",online:true,space:["seated","limited","open","online"],description:"A countdown shake-out to release tension and reset the room's energy. Fast, universal, works for any size.",instructions:["Stand up (or stay seated if needed).","Shake your right hand counting down from 8: 8-7-6-5-4-3-2-1!","Repeat with left hand, right foot, left foot — 8 counts each.","Repeat the whole sequence from 4, then 2, then 1.","End with a big jump, clap, or cheer!"],facilTip:"Works brilliantly online — everyone does it at their desk. Zero awkwardness, instant energy.",facilScript:"Stand up — or stay seated if you need to. We are going to shake out the energy. Right hand: 8, 7, 6, 5, 4, 3, 2, 1! Left hand! Right foot! Left foot! Now from 4... from 2... from 1! [Big finish!]",materials:"None",outcome:"Participants will feel physically activated, mentally present, and ready to engage with full energy."},
@@ -151,7 +192,6 @@ const EN_ACTIVITIES = [
   {id:12,name:"Mirror",type:"Energizer",minPeople:6,maxPeople:40,duration:7,objective:["energy","get-to-know"],familiarity:["strangers","acquaintances","colleagues"],energy:"medium",online:true,space:["seated","limited","open","online"],description:"Pairs mirror each other's slow movements — with no designated leader in the final round.",instructions:["Pair up. Face each other or use cameras online.","One person leads slow movements; the other mirrors exactly.","After 90 seconds, swap roles.","Round 3: no designated leader — try to move as one.","Debrief: what did it feel like to lead, follow, or share leadership?"],facilTip:"The third round with no leader is the magic. Soft background music enhances the effect.",facilScript:"Find a partner, face each other. One leads — move slowly. The other mirrors exactly. After 90 seconds I say switch. Then the last round: no leader. Move as one. Let's begin.",materials:"None (calm music optional)",outcome:"Participants will feel re-energized and more connected to the people around them."},
   {id:14,name:"Ninja",type:"Energizer",minPeople:6,maxPeople:25,duration:10,objective:["energy"],familiarity:["acquaintances","colleagues"],energy:"high",online:false,space:["open"],description:"A dramatic elimination game of frozen poses and single strikes — high energy, huge laughs.",instructions:["Stand in a circle. On 3-2-1-NINJA! everyone jumps into a frozen ninja pose.","Clockwise, each player makes ONE strike motion toward a neighbor's hand.","The target can dodge with ONE move. If hit, that hand goes behind their back.","Two hands lost = eliminated. Last ninja standing wins!"],facilTip:"Model it with maximum seriousness for maximum laughs. The dramatic posing sets the whole vibe.",facilScript:"Everyone in a circle. On 3-2-1, jump into your most powerful ninja pose and freeze. ONE strike at a neighbor's hand. They can dodge with ONE move. Two hands lost = eliminated. 3... 2... 1... NINJA!",materials:"None",outcome:"Participants will feel physically activated, mentally present, and ready to engage with full energy."},
   {id:20,name:"Ho Ha He (Butcher)",type:"Energizer",minPeople:8,maxPeople:40,duration:8,objective:["energy"],familiarity:["acquaintances","colleagues"],energy:"high",online:false,space:["limited","open"],description:"A circle game of sharp mimes and synchronized sounds — HO, HA, HE — getting faster, louder, and more chaotic each round.",instructions:["Stand in a circle. One person yells HO! miming a chopping motion top to bottom toward someone across.","That person yells HA! lifting both hands upward.","Their two neighbors yell HE! and mime slicing inward from each side.","The targeted person becomes the new sender. Speed up each round.","Optional: anyone who hesitates or makes a mistake is out. Last three win."],facilTip:"Teach slowly first — HO-HA-HE must click before you accelerate. Encourage maximum volume.",facilScript:"Watch: HO! [chop downward]. That person: HA! [hands up]. Their neighbors: HE! [slice inward]. Then it starts again. Slow first... good! Now faster. Louder. GO!",materials:"None",outcome:"Participants will feel physically activated, mentally present, and ready to engage with full energy."},
-
   {id:13,name:"Back to Back Rise",type:"Energizer",minPeople:4,maxPeople:30,duration:5,objective:["energy"],familiarity:["acquaintances","colleagues"],energy:"high",online:false,space:["open"],description:"Pairs try to stand up together from seated back-to-back — then scale to bigger groups.",instructions:["Find a partner. Sit back-to-back, knees bent, arms linked.","Try to stand up together WITHOUT using your hands.","Once up, join another pair (group of 4) and try again.","Keep adding people until the whole group attempts it together.","Debrief: what changed as the group got larger?"],facilTip:"Beautiful metaphor for interdependence. Check for mobility limitations beforehand.",facilScript:"Back-to-back on the floor, link arms, knees bent. Stand up together — without hands. Once up, grab another pair and try as 4. Keep growing!",materials:"None (clear floor space needed)",outcome:"Participants will feel physically activated, mentally present, and ready to engage with full energy."},
   {id:29,name:"Walk in the Forest",type:"Energizer",minPeople:4,maxPeople:200,duration:8,objective:["energy"],familiarity:["strangers","acquaintances","colleagues"],energy:"high",online:false,space:["seated","limited","open"],description:"The facilitator narrates a forest walk — then launches surprise obstacles (a bear, a branch, roots, mosquitoes) that trigger wild physical reactions. Chaos, laughter, full presence guaranteed.",instructions:["Ask everyone to stand up. Tell them to close their eyes and imagine they are walking through a beautiful forest. Start walking on the spot — legs moving, body still.","Narrate calmly: birds singing, sun through the trees, soft ground underfoot.","Then launch a surprise: Oh no — A BEAR! RUN! Everyone runs on the spot frantically.","Bring it back: It's OK, we left the bear behind. Walk normally. Nice and peaceful again...","Keep adding obstacles and reactions — branch (duck down), tree roots (jump repeatedly), puddle (giant leap), mosquitoes (swat wildly all around).","Vary the pace between peaceful calm and sudden chaos. End on a peaceful clearing — deep breath, well done everyone."],facilTip:"The magic is in your storytelling voice. Build suspense before each surprise, then react fully yourself — the group mirrors your energy. The contrast between peaceful walking and sudden chaos is what gets the laughs.",facilScript:"Everyone stand up. Close your eyes. We are walking through a beautiful forest... feel the ground under your feet... start walking... birds singing... so peaceful... wait... do you hear that?... OH NO — A BEAR!! RUN RUN RUN! [everyone runs on the spot] ...OK OK, we lost it, slow down... walk normally... that was close... OH CAREFUL — a branch! [duck!] ...phew... keep walking... ROOTS EVERYWHERE! [jump jump jump] ...nearly there... oh no MOSQUITOES! [swat wildly] ...OK they're gone... and here we are — a beautiful clearing. Deep breath. Well done everyone.",materials:"None",outcome:"Participants will feel physically activated, fully present, and united by shared laughter — a perfect re-energiser at any point in the session."},
   {id:21,name:"Circle of Introductions",type:"Icebreaker",minPeople:3,maxPeople:20,duration:15,objective:["get-to-know"],familiarity:["strangers","acquaintances"],energy:"low",online:true,space:["seated","limited","open","online"],description:"The classic round of introductions — elevated with a thoughtful prompt. Works in any setting, even when no one can move.",instructions:["Ask everyone to introduce themselves: name, where they are from, what they do.","Add one or two targeted prompts — something personal, forward-looking, or reflective.","Go around. For 15+ people, give a strict time limit (e.g. 60 seconds each).","After everyone has shared, invite the group to notice patterns or surprises."],facilTip:"The prompt is everything. What is one thing people would not guess from your job title? yields far richer sharing than tell us about your role.",facilScript:"Let's meet each other. Share your name, where you are from — and [your prompt]. About a minute each. I'll go first.",materials:"None",outcome:"Participants will feel more at ease, discover something new about each other, and build early connection."},
@@ -178,7 +218,6 @@ const FR_ACTIVITIES = [
   {id:12,name:"Miroir",type:"Energizer",minPeople:6,maxPeople:40,duration:7,objective:["energy","get-to-know"],familiarity:["strangers","acquaintances","colleagues"],energy:"medium",online:true,space:["seated","limited","open","online"],description:"Les paires se reflètent mutuellement dans des mouvements lents — sans chef désigné au dernier tour.",instructions:["En paires. Face à face (ou caméras en ligne).","Une personne guide des mouvements lents ; l'autre reflète exactement.","Après 90 secondes, changez de rôles.","Tour 3 : pas de chef — bougez comme un seul.","Débrief : qu'avez-vous ressenti ?"],facilTip:"Le troisième tour sans chef est la magie. Une musique douce amplifie l'effet.",facilScript:"Face à face. L'un guide — au ralenti. L'autre reflète. Après 90 secondes : changez. Dernier tour : pas de chef. Bougez comme un seul. Commençons.",materials:"Aucun (musique calme optionnelle)",outcome:"Les participants se sentiront dynamisés et plus connectés aux personnes qui les entourent."},
   {id:14,name:"Ninja",type:"Energizer",minPeople:6,maxPeople:25,duration:10,objective:["energy"],familiarity:["acquaintances","colleagues"],energy:"high",online:false,space:["open"],description:"Un jeu d'élimination dramatique de poses figées et de frappes uniques — haute énergie, fous rires garantis.",instructions:["En cercle. Sur 3-2-1-NINJA ! tout le monde saute dans une pose ninja figée.","Chaque joueur fait UNE frappe vers la main d'un voisin.","La cible peut esquiver avec UN mouvement. Si touchée, la main va dans le dos.","Deux mains perdues = éliminé. Le dernier ninja gagne !"],facilTip:"Modélisez avec un maximum de sérieux pour un maximum de rires.",facilScript:"En cercle. Sur 3-2-1, pose ninja. UNE frappe vers la main d'un voisin. Esquive avec UN mouvement. Deux mains perdues = éliminé. 3... 2... 1... NINJA !",materials:"Aucun",outcome:"Les participants se sentiront physiquement activés, mentalement présents et prêts à s'engager pleinement."},
   {id:20,name:"Ho Ha He (Le Bûcheron)",type:"Energizer",minPeople:8,maxPeople:40,duration:8,objective:["energy"],familiarity:["acquaintances","colleagues"],energy:"high",online:false,space:["limited","open"],description:"Un jeu en cercle de mimes précis et sons synchronisés — HO, HA, HE — de plus en plus rapide et chaotique.",instructions:["En cercle. Une personne crie HO ! en mimant une hache de haut en bas vers quelqu'un en face.","La personne ciblée crie HA ! en levant les deux mains vers le haut.","Les deux voisins crient HE ! et miment une coupe de chaque côté.","La personne ciblée devient le nouvel envoyeur. Accélérez.","Élimination optionnelle : quiconque hésite ou se trompe est éliminé."],facilTip:"Enseignez lentement d'abord — HO-HA-HE doit être compris avant d'accélérer.",facilScript:"HO ! [hache vers quelqu'un]. Cette personne : HA ! [mains vers le haut]. Ses voisins : HE ! [coupe de chaque côté]. Doucement d'abord... bien ! Plus vite. Plus fort. GO !",materials:"Aucun",outcome:"Les participants se sentiront physiquement activés, mentalement présents et prêts à s'engager pleinement."},
-
   {id:13,name:"Se Lever Dos à Dos",type:"Energizer",minPeople:4,maxPeople:30,duration:5,objective:["energy"],familiarity:["acquaintances","colleagues"],energy:"high",online:false,space:["open"],description:"Des paires essaient de se lever ensemble dos à dos — puis élargissent progressivement aux groupes.",instructions:["Trouvez un partenaire. Dos à dos, genoux pliés, bras liés.","Levez-vous ensemble SANS utiliser vos mains.","Une fois réussi, rejoignez une autre paire (groupe de 4) et réessayez.","Continuez jusqu'au groupe entier.","Débrief : qu'est-ce qui a changé ?"],facilTip:"Belle métaphore de l'interdépendance. Vérifiez les limitations de mobilité.",facilScript:"Dos à dos sur le sol, liez les bras, genoux pliés. Levez-vous ensemble — sans mains. Rejoignez une autre paire. Continuez à grandir !",materials:"Aucun (espace au sol nécessaire)",outcome:"Les participants se sentiront physiquement activés, mentalement présents et prêts à s'engager pleinement."},
   {id:29,name:"La Balade en Forêt",type:"Energizer",minPeople:4,maxPeople:200,duration:8,objective:["energy"],familiarity:["strangers","acquaintances","colleagues"],energy:"high",online:false,space:["seated","limited","open"],description:"Le facilitateur raconte une promenade en forêt — puis lance des obstacles surprises (un ours, une branche, des racines, des moustiques) qui déclenchent des réactions physiques incontrôlables. Chaos, fous rires et présence totale garantis.",instructions:["Demandez à tout le monde de se lever. Dites-leur de fermer les yeux et d'imaginer qu'ils se promènent dans une belle forêt. Commencez à marcher sur place — jambes en mouvement, corps stable.","Narrez calmement : oiseaux qui chantent, soleil entre les arbres, sol doux sous les pieds.","Lancez une surprise : Oh non — UN OURS ! COUREZ ! Tout le monde court sur place frénétiquement.","Retour au calme : C'est bon, on a semé l'ours. Marchez normalement. Paisible à nouveau...","Ajoutez des obstacles : branche (baisser la tête), racines (sauter), flaque (grand saut), moustiques (se battre contre eux dans tous les sens).","Variez le rythme entre calme paisible et chaos soudain. Terminez sur une belle clairière — grande inspiration, bravo tout le monde."],facilTip:"La magie vient de votre voix de conteur. Créez le suspense avant chaque surprise, puis réagissez vous-même à fond — le groupe copie votre énergie. Le contraste entre la marche paisible et le chaos soudain, c'est ce qui provoque les éclats de rire.",facilScript:"Tout le monde debout. Fermez les yeux. Nous nous promenons dans une belle forêt... sentez le sol sous vos pieds... commencez à marcher... des oiseaux chantent... c'est paisible... attendez... vous entendez ça ?... OH NON — UN OURS !! COUREZ COUREZ COUREZ ! [tout le monde court sur place] ...OK OK, on l'a semé, ralentissez... marchez normalement... on l'a échappé belle... ATTENTION — une branche ! [baisser la tête !] ...ouf... on continue... DES RACINES PARTOUT ! [sautez sautez sautez] ...presque là... oh non DES MOUSTIQUES ! [se battre dans tous les sens] ...disparus... et nous voilà dans une belle clairière. Grande inspiration. Bravo tout le monde.",materials:"Aucun",outcome:"Les participants se sentiront physiquement activés, totalement présents et unis par le rire — un parfait regain d'énergie à n'importe quel moment de la session."},
   {id:21,name:"Tour de Présentation",type:"Icebreaker",minPeople:3,maxPeople:20,duration:15,objective:["get-to-know"],familiarity:["strangers","acquaintances"],energy:"low",online:true,space:["seated","limited","open","online"],description:"Le classique tour de présentations — enrichi d'une question ciblée. Fonctionne dans n'importe quel contexte.",instructions:["Demandez à chacun de se présenter : nom, d'où il vient, ce qu'il fait.","Ajoutez une ou deux questions ciblées — personnelles, prospectives ou réflexives.","Faites le tour. Pour 15+, fixez une limite de temps (60 secondes).","Invitez le groupe à noter les points communs ou surprises."],facilTip:"La qualité de la question fait toute la différence.",facilScript:"Prenons quelques minutes pour nous rencontrer. Votre nom, d'où vous venez — et [votre question]. Environ une minute. Je commence...",materials:"Aucun",outcome:"Les participants se sentiront plus à l'aise, découvriront quelque chose de nouveau et créeront une connexion initiale."},
@@ -205,7 +244,6 @@ const VI_ACTIVITIES = [
   {id:12,name:"Gương",type:"Energizer",minPeople:6,maxPeople:40,duration:7,objective:["energy","get-to-know"],familiarity:["strangers","acquaintances","colleagues"],energy:"medium",online:true,space:["seated","limited","open","online"],description:"Các cặp phản chiếu chuyển động chậm của nhau — không có người dẫn ở vòng cuối.",instructions:["Từng cặp. Đứng đối mặt (hoặc qua camera trực tuyến).","Một người dẫn chuyển động chậm; người kia phản chiếu chính xác.","Sau 90 giây, đổi vai.","Vòng 3: không ai dẫn — cố gắng chuyển động như một người.","Thảo luận: cảm giác dẫn, theo và chia sẻ lãnh đạo như thế nào?"],facilTip:"Vòng thứ ba không có người dẫn mới là điều kỳ diệu. Nhạc nền nhẹ nhàng tăng thêm hiệu ứng.",facilScript:"Tìm một người bạn, đứng đối mặt. Một người dẫn — chuyển động chậm. Người kia phản chiếu. Sau 90 giây tôi nói đổi. Vòng cuối: không ai dẫn. Bắt đầu.",materials:"Không cần (nhạc nhẹ tùy chọn)",outcome:"Người tham gia sẽ cảm thấy được nạp năng lượng và kết nối hơn với những người xung quanh."},
   {id:14,name:"Ninja",type:"Energizer",minPeople:6,maxPeople:25,duration:10,objective:["energy"],familiarity:["acquaintances","colleagues"],energy:"high",online:false,space:["open"],description:"Trò chơi loại trừ kịch tính với tư thế đóng băng và đòn đánh đơn — năng lượng cao, cười không ngừng.",instructions:["Vòng tròn. Khi hô 3-2-1-NINJA! mọi người nhảy vào tư thế ninja và đóng băng.","Theo chiều kim đồng hồ, mỗi người thực hiện MỘT động tác đánh về phía tay người bên cạnh.","Người bị đánh có thể né với MỘT chuyển động. Nếu trúng, tay đó để sau lưng.","Mất hai tay = bị loại. Ninja cuối cùng đứng thắng!"],facilTip:"Biểu diễn với sự nghiêm túc tối đa để tạo ra tiếng cười tối đa.",facilScript:"Vòng tròn. Khi tôi đếm 3-2-1, nhảy vào tư thế ninja mạnh nhất và đóng băng. MỘT đòn đánh. Né với MỘT chuyển động. Mất hai tay = bị loại. 3... 2... 1... NINJA!",materials:"Không cần",outcome:"Người tham gia sẽ cảm thấy được kích hoạt thể chất, tỉnh táo và sẵn sàng tham gia với đầy đủ năng lượng."},
   {id:20,name:"Ho Ha He (Tiều Phu)",type:"Energizer",minPeople:8,maxPeople:40,duration:8,objective:["energy"],familiarity:["acquaintances","colleagues"],energy:"high",online:false,space:["limited","open"],description:"Trò chơi vòng tròn với cử chỉ và âm thanh — HO, HA, HE — ngày càng nhanh hơn, to hơn và hỗn loạn hơn.",instructions:["Vòng tròn. Một người hô HO! và giả vờ chặt cây từ trên xuống hướng về ai đó.","Người bị chỉ vào hô HA! và đẩy hai tay từ dưới lên trên.","Hai người hàng xóm của họ cùng hô HE! và giả vờ chặt từ hai bên vào.","Người bị chỉ vào trở thành người gửi mới. Tăng tốc mỗi vòng.","Loại trừ tùy chọn: ai do dự hoặc làm sai bị loại."],facilTip:"Dạy chậm trước — chuỗi HO-HA-HE phải được hiểu rõ trước khi tăng tốc.",facilScript:"HO! [chặt xuống về phía ai đó]. Người đó: HA! [tay lên]. Hai người hàng xóm: HE! [chặt từ hai bên]. Chậm trước... tốt! Giờ nhanh hơn. To hơn. BẮT ĐẦU!",materials:"Không cần",outcome:"Người tham gia sẽ cảm thấy được kích hoạt thể chất, tỉnh táo và sẵn sàng tham gia với đầy đủ năng lượng."},
-  {id:29,name:"Di Trong Rung",type:"Energizer",minPeople:4,maxPeople:200,duration:8,objective:["energy"],familiarity:["strangers","acquaintances","colleagues"],energy:"high",online:false,space:["seated","limited","open"],description:"Moi nguoi tuong tuong dang di dao trong rung. Nguoi dan ke chuyen va tung ra nhung bat ngo khien ca phong chay, nhay, ne va cuoi khong ngung.",instructions:["Yeu cau moi nguoi dung day. Nham mat lai, chung ta dang di dao trong mot khu rung dep. Bat dau di bo tai cho.","Nguoi dan ke chuyen va dua ra cac tinh huong tung cai mot, moi tinh huong doi hoi mot phan ung the chat.","Vi du: Oi khong mot CON GAU, chay thoi! (moi nguoi chay tai cho). On roi di binh thuong thoi. Can than mot cai canh cay! (khom nguoi xuong). Re cay o khap noi! (nhay qua). Oi khong MUOI! (dap muoi xung quanh).","Thay doi nhip do giua nhung khoanh khac binh yen va nhung bat ngo dot ngot.","Ket thuc tai mot bai co yen binh: Chung ta den roi. Hit tho sau. Dep khong?"],facilTip:"Phep mau nam o giong ke chuyen cua ban. Tao su hoi hop truoc bat ngo, roi phan ung het minh. Ban cang kich tinh va hai huoc, nhom cang huong ung.",facilScript:"Moi nguoi dung day. Nham mat lai. Chung ta dang di dao trong mot khu rung dep... cam nhan mat dat duoi chan... bat dau di bo... that binh yen... chim hot liu lo... cho da... cac ban co nghe thay gi khong... OI KHONG CON GAU CHAY THOI! [moi nguoi chay tai cho] ...on roi on roi, minh thoat roi, cham lai... di binh thuong... CAN THAN CANH CAY! [khom nguoi] ...phu... RE CAY KHAP NOI! [nhay nhay nhay] ...qua roi... Oi MUOI! [dap xung quanh] ...het roi... va day roi mot bai co dep. Hit tho sau. Gioi lam moi nguoi.",materials:"Khong can",outcome:"Nguoi tham gia se cam thay duoc kich hoat the chat, hoan toan hien dien va cung nhau cuoi, mot man khoi dong lai hoan hao cho bat ky thoi diem nao trong buoi."},
   {id:13,name:"Đứng Dậy Lưng Kề Lưng",type:"Energizer",minPeople:4,maxPeople:30,duration:5,objective:["energy"],familiarity:["acquaintances","colleagues"],energy:"high",online:false,space:["open"],description:"Các cặp thử đứng dậy cùng nhau từ tư thế ngồi lưng kề lưng — rồi mở rộng sang các nhóm lớn hơn.",instructions:["Tìm một người bạn. Ngồi lưng kề lưng, đầu gối cong, tay móc vào nhau.","Thử đứng dậy cùng nhau mà KHÔNG dùng tay.","Khi thành công, tham gia cặp khác (nhóm 4) và thử lại.","Tiếp tục thêm người cho đến khi cả nhóm thử cùng nhau.","Thảo luận: điều gì thay đổi khi nhóm lớn hơn?"],facilTip:"Ẩn dụ đẹp về sự phụ thuộc lẫn nhau. Kiểm tra hạn chế về thể chất trước.",facilScript:"Lưng kề lưng, móc tay, đầu gối cong. Đứng dậy cùng nhau — không dùng tay. Khi xong, tham gia cặp khác. Tiếp tục lớn hơn!",materials:"Không cần (cần không gian sàn trống)",outcome:"Người tham gia sẽ cảm thấy được kích hoạt thể chất, tỉnh táo và sẵn sàng tham gia với đầy đủ năng lượng."},
   {id:29,name:"Đi Dạo Trong Rừng",type:"Energizer",minPeople:4,maxPeople:200,duration:8,objective:["energy"],familiarity:["strangers","acquaintances","colleagues"],energy:"high",online:false,space:["seated","limited","open"],description:"Người dẫn kể chuyện một chuyến đi rừng — rồi tung ra những bất ngờ (con gấu, cành cây, rễ cây, muỗi) khiến cả phòng chạy, nhảy, né và cười không ngừng.",instructions:["Yêu cầu mọi người đứng dậy. Nhắm mắt lại, tưởng tượng đang đi dạo trong một khu rừng đẹp. Bắt đầu đi bộ tại chỗ — chân di chuyển, thân người giữ nguyên.","Kể chuyện nhẹ nhàng: chim hót líu lo, nắng chiếu qua tán cây, mặt đất mềm dưới chân.","Tung ra bất ngờ: Ôi không — MỘT CON GẤU! CHẠY THÔI! Mọi người chạy tại chỗ điên cuồng.","Trở lại bình thường: Ổn rồi, mình đã để lại con gấu phía sau. Đi bình thường thôi. Yên tĩnh trở lại...","Thêm các chướng ngại vật và phản ứng — cành cây (cúi đầu), rễ cây (nhảy liên tục), vũng nước (nhảy to), muỗi (phủi điên cuồng khắp người).","Xen kẽ giữa những khoảng yên bình và sự hỗn loạn đột ngột. Kết thúc tại một bãi cỏ đẹp — hít thở sâu, làm tốt lắm mọi người."],facilTip:"Phép màu nằm ở giọng kể chuyện của bạn. Tạo sự hồi hộp trước mỗi bất ngờ, rồi phản ứng hết mình — nhóm sẽ phản chiếu năng lượng của bạn. Sự tương phản giữa đi bộ yên tĩnh và hỗn loạn đột ngột chính là điều tạo ra tiếng cười.",facilScript:"Mọi người đứng dậy. Nhắm mắt lại. Chúng ta đang đi dạo trong một khu rừng đẹp... cảm nhận mặt đất dưới chân... bắt đầu đi bộ... thật bình yên... chim hót líu lo... thư thái quá... chờ đã... các bạn có nghe thấy gì không... ÔI KHÔNG MỘT CON GẤU CHẠY THÔI! [mọi người chạy tại chỗ] ...ổn rồi ổn rồi, mình thoát rồi, chậm lại... đi bình thường... thoát hiểm rồi... CẨNTHẬN CÓ CÀNH CÂY! [cúi đầu!] ...phù... tiếp tục đi... RỄ CÂY KHẮP NƠI! [nhảy nhảy nhảy] ...qua rồi... ôi không MUỖI! [phủi khắp người] ...hết rồi... và đây rồi một bãi cỏ đẹp. Hít thở sâu. Giỏi lắm mọi người.",materials:"Không cần",outcome:"Người tham gia sẽ cảm thấy được kích hoạt thể chất, hoàn toàn hiện diện và cùng nhau cười — một màn khởi động lại hoàn hảo cho bất kỳ thời điểm nào trong buổi."},
   {id:21,name:"Vòng Giới Thiệu",type:"Icebreaker",minPeople:3,maxPeople:20,duration:15,objective:["get-to-know"],familiarity:["strangers","acquaintances"],energy:"low",online:true,space:["seated","limited","open","online"],description:"Vòng giới thiệu cổ điển — được nâng cấp với một câu hỏi sâu sắc. Phù hợp mọi bối cảnh.",instructions:["Mọi người tự giới thiệu: tên, đến từ đâu, làm gì.","Thêm một hoặc hai câu hỏi phù hợp — cá nhân, hướng tới tương lai hoặc sâu sắc.","Lần lượt từng người. Với 15+ người, giới hạn thời gian mỗi người (60 giây).","Sau khi tất cả chia sẻ, mời nhóm nhận xét điểm chung hoặc điều thú vị."],facilTip:"Câu hỏi quyết định tất cả. Điều gì người ta không đoán được từ chức danh của bạn? sẽ tạo ra chia sẻ phong phú hơn.",facilScript:"Dành vài phút để làm quen nhau. Chia sẻ tên, đến từ đâu — và [câu hỏi của bạn]. Khoảng một phút mỗi người. Tôi bắt đầu trước.",materials:"Không cần",outcome:"Người tham gia sẽ cảm thấy thoải mái hơn, khám phá điều mới về nhau và tạo kết nối ban đầu."},
@@ -249,6 +287,7 @@ function App(){
   const [selected,setSelected]=useState(null);
   const [prevView,setPrevView]=useState(null);
   const {favs,toggle,loaded}=useFavourites();
+  const {canInstall,install}=useInstallPrompt();
   const t=T[lang];
   const acts=ACTIVITIES[lang]||ACTIVITIES["en"];
 
@@ -289,7 +328,11 @@ function App(){
   const favList=acts.filter(a=>favs.includes(a.id));
 
   const LangToggle=()=>(
-    <select value={lang} onChange={e=>setLang(e.target.value)} style={{background:"#fff",border:"1.5px solid #7EADBF",borderRadius:20,padding:"5px 10px",cursor:"pointer",color:"#42708C",fontSize:12,fontWeight:700,outline:"none"}}>
+    <select
+      value={lang}
+      onChange={e=>setLang(e.target.value)}
+      aria-label="Select language"
+      style={{background:"#fff",border:"1.5px solid #7EADBF",borderRadius:20,padding:"5px 10px",cursor:"pointer",color:"#42708C",fontSize:12,fontWeight:700}}>
       <option value="en">🇬🇧 EN</option>
       <option value="fr">🇫🇷 FR</option>
       <option value="vi">🇻🇳 VI</option>
@@ -298,19 +341,28 @@ function App(){
 
   return(
     <div style={{minHeight:"100vh",background:C.cream,fontFamily:"'DM Sans','Segoe UI',sans-serif",color:C.dark}}>
-      <div className="no-print" style={{background:C.cream,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:10}}>
+      {/* WCAG: sticky header uses nav for semantics */}
+      <header className="no-print" style={{background:C.cream,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:10}}>
         <div style={{maxWidth:390,margin:"0 auto",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <div style={{width:80}}>{view!=="home"&&<button onClick={back} style={{background:"none",border:`1px solid ${C.border}`,color:C.mid,borderRadius:20,padding:"6px 12px",cursor:"pointer",fontSize:12,fontWeight:600,whiteSpace:"nowrap"}}>← Back</button>}</div>
-          <span style={{fontWeight:900,fontSize:15,color:C.red,textAlign:"center"}}>📢 Facilitation Toolkit</span>
+          <div style={{width:80,minHeight:44,display:"flex",alignItems:"center"}}>
+            {view!=="home"&&
+              <button
+                onClick={back}
+                aria-label={t.back}
+                style={{background:"none",border:`1px solid ${C.border}`,color:C.mid,borderRadius:20,padding:"6px 12px",cursor:"pointer",fontSize:12,fontWeight:600,whiteSpace:"nowrap",minHeight:44,minWidth:44}}>
+                {t.back}
+              </button>}
+          </div>
+          <span role="heading" aria-level="1" style={{fontWeight:900,fontSize:15,color:C.red,textAlign:"center"}}>📢 FaciToolkit</span>
           <LangToggle/>
         </div>
-      </div>
+      </header>
 
-      <div style={{maxWidth:390,margin:"0 auto",padding:"0 16px 60px"}}>
+      <main style={{maxWidth:390,margin:"0 auto",padding:"0 16px 60px"}}>
         {view==="home"&&(
           <div>
             <div style={{textAlign:"center",padding:"36px 0 28px"}}>
-              <h1 style={{margin:0,fontSize:26,fontWeight:900,letterSpacing:-0.8,color:C.dark,lineHeight:1.3}}>
+              <h1 style={{margin:0,fontSize:26,fontWeight:900,letterSpacing:-0.8,color:C.dark,lineHeight:1.4}}>
                 {t.headline1}<br/>
                 <span style={{color:C.red}}>{t.headline2}</span> {t.headline3} <span style={{color:C.teal}}>{t.headline4}</span>
               </h1>
@@ -319,10 +371,24 @@ function App(){
               <HomeCard emoji="🎯" title={t.filterTitle} subtitle={t.filterSub} tag={t.filterTag} tagColor={C.red} bg={C.redLight} border={`${C.red}30`} titleColor={C.red} onClick={()=>go("filter")}/>
               <HomeCard emoji="📚" title={t.browseTitle} subtitle={t.browseSub(acts.length)} bg={C.tealLight} border={`${C.teal}30`} titleColor={C.teal} onClick={()=>go("directory")}/>
               <HomeCard emoji="❤️" title={t.favTitle(loaded?favList.length:0)} subtitle={favList.length===0?t.favSubEmpty:favList.map(a=>a.name).join(", ")} bg="#efe6da" border="#8C674630" titleColor="#8C6746" onClick={()=>go("favourites")}/>
-              <a href="mailto:dinhlong.pham93@gmail.com?subject=Facilitation Toolkit — Feedback" style={{background:"none",border:`1.5px solid ${C.border}`,borderRadius:20,padding:"16px 22px",textAlign:"center",color:C.mid,width:"100%",textDecoration:"none",display:"block",boxSizing:"border-box"}}>
+              {/* Android install prompt — only shows when browser fires beforeinstallprompt */}
+              {canInstall&&(
+                <button
+                  onClick={install}
+                  style={{background:"#fff",border:`1.5px solid ${C.border}`,borderRadius:20,padding:"16px 22px",textAlign:"left",cursor:"pointer",color:C.dark,width:"100%",display:"flex",alignItems:"center",gap:14}}>
+                  <span style={{fontSize:24}}>📲</span>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:14,marginBottom:2,color:C.teal}}>{t.addToHome}</div>
+                    <div style={{fontSize:13,color:C.muted}}>{t.addToHomeSub}</div>
+                  </div>
+                </button>
+              )}
+              <a
+                href="mailto:dinhlong.pham93@gmail.com?subject=FaciToolkit — Feedback"
+                style={{background:"none",border:`1.5px solid ${C.border}`,borderRadius:20,padding:"16px 22px",textAlign:"center",color:C.mid,width:"100%",textDecoration:"none",display:"block",boxSizing:"border-box"}}>
                 <div style={{fontSize:16,marginBottom:4}}>💬</div>
                 <div style={{fontWeight:700,fontSize:14,marginBottom:2,color:C.dark}}>{t.feedbackTitle}</div>
-                <div style={{fontSize:12}}>{t.feedbackSub}</div>
+                <div style={{fontSize:13}}>{t.feedbackSub}</div>
               </a>
             </div>
           </div>
@@ -333,8 +399,8 @@ function App(){
         {view==="results"&&(
           <div style={{paddingTop:28}}>
             <h2 style={{margin:"0 0 4px",fontSize:20,fontWeight:900}}>{results.length>0?t.activities(results.length):t.noMatchResults}</h2>
-            <p style={{margin:"0 0 20px",color:C.muted,fontSize:13}}>{results.length>0?t.tapToSee:t.adjustFilters}</p>
-            {nearestMatch&&<div style={{background:"#fff8e1",border:"1.5px solid #f5c518",borderRadius:12,padding:"10px 14px",marginBottom:18,fontSize:13,color:"#7a6000"}}>{t.nearestMatch}</div>}
+            <p style={{margin:"0 0 20px",color:C.muted,fontSize:16,lineHeight:1.5}}>{results.length>0?t.tapToSee:t.adjustFilters}</p>
+            {nearestMatch&&<div role="alert" style={{background:"#fff8e1",border:"1.5px solid #f5c518",borderRadius:12,padding:"10px 14px",marginBottom:18,fontSize:15,color:"#7a6000"}}>{t.nearestMatch}</div>}
             {results.length===0?<EmptyState t={t} onRetry={()=>go("filter")}/>:<ActivityList activities={results} onSelect={openActivity} favs={favs} onToggleFav={toggle} t={t} lang={lang}/>}
           </div>
         )}
@@ -344,18 +410,18 @@ function App(){
         {view==="favourites"&&(
           <div style={{paddingTop:28}}>
             <h2 style={{margin:"0 0 4px",fontSize:20,fontWeight:900}}>{t.myFavourites}</h2>
-            <p style={{margin:"0 0 20px",color:C.muted,fontSize:13}}>{favList.length===0?t.favNone:t.saved(favList.length)}</p>
+            <p style={{margin:"0 0 20px",color:C.muted,fontSize:16,lineHeight:1.5}}>{favList.length===0?t.favNone:t.saved(favList.length)}</p>
             {favList.length===0?(
               <div style={{textAlign:"center",padding:"48px 0",color:C.muted}}>
-                <div style={{fontSize:44,marginBottom:14}}>♡</div>
-                <p style={{fontSize:15}}>{t.favEmpty}</p>
+                <div style={{fontSize:44,marginBottom:14}} aria-hidden="true">♡</div>
+                <p style={{fontSize:16,lineHeight:1.5}}>{t.favEmpty}</p>
               </div>
             ):<ActivityList activities={favList} onSelect={openActivity} favs={favs} onToggleFav={toggle} t={t} lang={lang}/>}
           </div>
         )}
 
         {view==="detail"&&selected&&<ActivityDetail activity={selected} isFav={favs.includes(selected.id)} onToggleFav={()=>toggle(selected.id)} t={t} lang={lang}/>}
-      </div>
+      </main>
     </div>
   );
 }
@@ -363,12 +429,15 @@ function App(){
 function HomeCard({emoji,title,subtitle,onClick,bg,border,tag,tagColor,titleColor}){
   const [hover,setHover]=useState(false);
   return(
-    <button onClick={onClick} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
-      style={{background:hover?bg.replace("ea","d8").replace("dc","ca").replace("e6","d4"):bg,border:`1.5px solid ${border}`,borderRadius:20,padding:"20px 18px",cursor:"pointer",textAlign:"left",color:C.dark,width:"100%",transition:"all 0.2s",position:"relative"}}>
+    <button
+      onClick={onClick}
+      onMouseEnter={()=>setHover(true)}
+      onMouseLeave={()=>setHover(false)}
+      style={{background:hover?bg.replace("ea","d8").replace("dc","ca").replace("e6","d4"):bg,border:`1.5px solid ${border}`,borderRadius:20,padding:"20px 18px",cursor:"pointer",textAlign:"left",color:C.dark,width:"100%",transition:"background 0.2s, border-color 0.2s",position:"relative",minHeight:44}}>
       {tag&&<div style={{position:"absolute",top:14,right:14,background:`${tagColor}18`,border:`1px solid ${tagColor}40`,color:tagColor,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700}}>{tag}</div>}
-      <div style={{fontSize:24,marginBottom:8}}>{emoji}</div>
+      <div style={{fontSize:24,marginBottom:8}} aria-hidden="true">{emoji}</div>
       <div style={{fontSize:16,fontWeight:900,marginBottom:4,color:titleColor||C.dark}}>{title}</div>
-      <div style={{color:C.muted,fontSize:13}}>{subtitle}</div>
+      <div style={{color:C.muted,fontSize:15,lineHeight:1.5}}>{subtitle}</div>
     </button>
   );
 }
@@ -395,29 +464,30 @@ function FilterFlow({t,onApply}){
   return(
     <div style={{paddingTop:28}}>
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-        <span style={{fontSize:12,color:C.muted}}>{t.step(step+1,steps.length)}</span>
-        <span style={{fontSize:12,color:C.muted}}>{pct}%</span>
+        <span style={{fontSize:14,color:C.muted}}>{t.step(step+1,steps.length)}</span>
+        <span style={{fontSize:14,color:C.muted}}>{pct}%</span>
       </div>
-      <div style={{height:5,background:C.border,borderRadius:4,marginBottom:32,overflow:"hidden"}}>
+      {/* WCAG: progress bar with role */}
+      <div role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={t.step(step+1,steps.length)} style={{height:5,background:C.border,borderRadius:4,marginBottom:32,overflow:"hidden"}}>
         <div style={{height:"100%",width:`${pct}%`,background:C.red,borderRadius:4,transition:"width 0.3s"}}/>
       </div>
-      <div style={{fontSize:30,marginBottom:8}}>{current.emoji}</div>
+      <div style={{fontSize:30,marginBottom:8}} aria-hidden="true">{current.emoji}</div>
       <h2 style={{margin:"0 0 22px",fontSize:22,fontWeight:900}}>{current.label}</h2>
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {current.options.map(opt=>(
           <button key={opt.value} onClick={()=>select(opt.value)}
             onMouseEnter={e=>{e.currentTarget.style.background=C.redLight;e.currentTarget.style.borderColor=`${C.red}60`;e.currentTarget.style.color=C.red;}}
             onMouseLeave={e=>{e.currentTarget.style.background="#fff";e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.dark;}}
-            style={{background:"#fff",border:`1.5px solid ${C.border}`,borderRadius:14,padding:"14px 18px",cursor:"pointer",color:C.dark,textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"all 0.15s"}}>
+            style={{background:"#fff",border:`1.5px solid ${C.border}`,borderRadius:14,padding:"14px 18px",cursor:"pointer",color:C.dark,textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"background 0.15s, border-color 0.15s, color 0.15s",minHeight:44}}>
             <div>
               <div style={{fontSize:15,fontWeight:700}}>{opt.label}</div>
-              {opt.sub&&<div style={{fontSize:12,color:C.muted,marginTop:2}}>{opt.sub}</div>}
+              {opt.sub&&<div style={{fontSize:13,color:C.muted,marginTop:2}}>{opt.sub}</div>}
             </div>
-            <span style={{color:C.border,fontSize:16}}>→</span>
+            <span aria-hidden="true" style={{color:C.border,fontSize:16}}>→</span>
           </button>
         ))}
       </div>
-      <button onClick={()=>onApply(filters)} style={{marginTop:20,background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:13,width:"100%",textAlign:"center"}}>{t.skipFilters}</button>
+      <button onClick={()=>onApply(filters)} style={{marginTop:20,background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:15,width:"100%",textAlign:"center",padding:"12px 0",minHeight:44}}>{t.skipFilters}</button>
     </div>
   );
 }
@@ -431,24 +501,24 @@ function DirectoryView({activities,onSelect,favs,onToggleFav,t,lang}){
     if(peopleFilter){const n=parseInt(peopleFilter);return n>=a.minPeople&&n<=a.maxPeople;}
     return true;
   });
-  const chip=(active,color)=>({background:active?color:"transparent",border:`1.5px solid ${active?color:C.border}`,borderRadius:20,padding:"6px 12px",cursor:"pointer",color:active?"#fff":C.mid,fontSize:12,fontWeight:700,whiteSpace:"nowrap"});
+  const chip=(active,color)=>({background:active?color:"transparent",border:`1.5px solid ${active?color:C.border}`,borderRadius:20,padding:"8px 14px",cursor:"pointer",color:active?"#fff":C.mid,fontSize:13,fontWeight:700,whiteSpace:"nowrap",minHeight:44,display:"inline-flex",alignItems:"center"});
   return(
     <div style={{paddingTop:28}}>
       <h2 style={{margin:"0 0 14px",fontSize:20,fontWeight:900}}>{t.allActivities}</h2>
-      <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+      <div role="tablist" style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
         {[{key:"All",label:t.all(activities.length),color:C.dark},{key:"Icebreaker",label:t.icebreakers(activities.filter(a=>a.type==="Icebreaker").length),color:C.teal},{key:"Energizer",label:t.energizers(activities.filter(a=>a.type==="Energizer").length),color:C.red}].map(tab=>(
-          <button key={tab.key} onClick={()=>setTypeTab(tab.key)} style={chip(typeTab===tab.key,tab.color)}>{tab.label}</button>
+          <button key={tab.key} role="tab" aria-selected={typeTab===tab.key} onClick={()=>setTypeTab(tab.key)} style={chip(typeTab===tab.key,tab.color)}>{tab.label}</button>
         ))}
       </div>
-      <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap",alignItems:"center"}}>
-        <span style={{fontSize:12,color:C.muted,fontWeight:600,paddingRight:2}}>👥</span>
+      <div style={{display:"flex",gap:8,marginBottom:18,flexWrap:"wrap",alignItems:"center"}}>
+        <span aria-hidden="true" style={{fontSize:14,color:C.muted,fontWeight:600,paddingRight:2}}>👥</span>
         {PEOPLE_OPTIONS.map(o=>(
           <button key={o.value} onClick={()=>setPeopleFilter(o.value)} style={chip(peopleFilter===o.value,C.dark)}>{o.label}</button>
         ))}
       </div>
-      <p style={{margin:"0 0 14px",fontSize:12,color:C.muted}}>{t.activities(filtered.length)}</p>
+      <p style={{margin:"0 0 14px",fontSize:14,color:C.muted}}>{t.activities(filtered.length)}</p>
       {filtered.length===0
-        ?<div style={{textAlign:"center",padding:"40px 0",color:C.muted}}><div style={{fontSize:40,marginBottom:12}}>🔍</div><p>{t.noMatch}</p></div>
+        ?<div style={{textAlign:"center",padding:"40px 0",color:C.muted}}><div aria-hidden="true" style={{fontSize:40,marginBottom:12}}>🔍</div><p style={{fontSize:16}}>{t.noMatch}</p></div>
         :<ActivityList activities={filtered} onSelect={onSelect} favs={favs} onToggleFav={onToggleFav} t={t} lang={lang}/>}
     </div>
   );
@@ -464,28 +534,33 @@ function ActivityCard({activity,onClick,isFav,onToggleFav,t,lang}){
   return(
     <div style={{position:"relative"}}>
       <button onClick={onClick} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
-        style={{background:hover?tp.lightBg:"#fff",border:`1.5px solid ${hover?tp.color+"50":C.border}`,borderRadius:18,padding:"16px 18px",cursor:"pointer",textAlign:"left",color:C.dark,width:"100%",transition:"all 0.18s",boxShadow:hover?`0 4px 16px ${tp.color}18`:"none"}}>
+        style={{background:hover?tp.lightBg:"#fff",border:`1.5px solid ${hover?tp.color+"50":C.border}`,borderRadius:18,padding:"16px 18px",cursor:"pointer",textAlign:"left",color:C.dark,width:"100%",transition:"background 0.18s, border-color 0.18s, box-shadow 0.18s",boxShadow:hover?`0 4px 16px ${tp.color}18`:"none"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-          <span style={{background:tp.bg,border:`1px solid ${tp.color}40`,color:tp.color,borderRadius:20,padding:"3px 11px",fontSize:11,fontWeight:800}}>{TYPE_LABEL[lang][activity.type]}</span>
-          <div style={{display:"flex",gap:6,alignItems:"center",paddingRight:24}}>
-            {activity.online&&<span style={{fontSize:11,color:"#8C6746",background:"#efe6da",border:"1px solid #8C674630",borderRadius:20,padding:"3px 8px",fontWeight:700}}>{t.onlineOK}</span>}
-            <span style={{fontSize:12,color:C.muted}}>⏱ {activity.duration}{t.min}</span>
+          <span style={{background:tp.bg,border:`1px solid ${tp.color}40`,color:tp.color,borderRadius:20,padding:"3px 11px",fontSize:12,fontWeight:800}}>{TYPE_LABEL[lang][activity.type]}</span>
+          <div style={{display:"flex",gap:6,alignItems:"center",paddingRight:32}}>
+            {activity.online&&<span style={{fontSize:12,color:"#8C6746",background:"#efe6da",border:"1px solid #8C674630",borderRadius:20,padding:"3px 8px",fontWeight:700}}>{t.onlineOK}</span>}
+            <span style={{fontSize:13,color:C.muted}}>⏱ {activity.duration}{t.min}</span>
           </div>
         </div>
-        <div style={{fontSize:15,fontWeight:900,marginBottom:6}}>{activity.name}</div>
-        <p style={{margin:"0 0 10px",color:C.mid,fontSize:13,lineHeight:1.55}}>{activity.description}</p>
-        <div style={{margin:"0 0 12px",background:tp.lightBg,borderLeft:`3px solid ${tp.color}`,borderRadius:"0 8px 8px 0",padding:"8px 12px",fontSize:12,color:C.mid,lineHeight:1.5}}>
+        <div style={{fontSize:16,fontWeight:900,marginBottom:6}}>{activity.name}</div>
+        <p style={{margin:"0 0 10px",color:C.mid,fontSize:15,lineHeight:1.6}}>{activity.description}</p>
+        <div style={{margin:"0 0 12px",background:tp.lightBg,borderLeft:`3px solid ${tp.color}`,borderRadius:"0 8px 8px 0",padding:"8px 12px",fontSize:14,color:C.mid,lineHeight:1.5}}>
           ✨ {activity.outcome}
         </div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          <span style={{fontSize:11,color:C.muted,background:C.cream,border:`1px solid ${C.border}`,borderRadius:20,padding:"3px 10px"}}>👥 {activity.minPeople}–{activity.maxPeople}</span>
-          <span style={{fontSize:11,color:en.color,background:en.color+"15",border:`1px solid ${en.color}30`,borderRadius:20,padding:"3px 10px",fontWeight:600}}>{en.emoji} {en.label[lang]}</span>
+          <span style={{fontSize:12,color:C.muted,background:C.cream,border:`1px solid ${C.border}`,borderRadius:20,padding:"4px 10px"}}>👥 {activity.minPeople}–{activity.maxPeople}</span>
+          <span style={{fontSize:12,color:en.color,background:en.color+"15",border:`1px solid ${en.color}30`,borderRadius:20,padding:"4px 10px",fontWeight:600}}>{en.emoji} {en.label[lang]}</span>
           {activity.space.map(s=>(
-            <span key={s} style={{fontSize:11,color:C.muted,background:C.cream,border:`1px solid ${C.border}`,borderRadius:20,padding:"3px 10px"}}>{SPACE_META[lang][s].emoji} {SPACE_META[lang][s].label}</span>
+            <span key={s} style={{fontSize:12,color:C.muted,background:C.cream,border:`1px solid ${C.border}`,borderRadius:20,padding:"4px 10px"}}>{SPACE_META[lang][s].emoji} {SPACE_META[lang][s].label}</span>
           ))}
         </div>
       </button>
-      <button onClick={e=>{e.stopPropagation();onToggleFav();}} style={{position:"absolute",top:12,right:12,background:"none",border:"none",cursor:"pointer",fontSize:20,lineHeight:1,padding:4,zIndex:2}}>
+      {/* WCAG: 44px tap target + aria-label on icon-only button */}
+      <button
+        onClick={e=>{e.stopPropagation();onToggleFav();}}
+        aria-label={isFav?t.toggleFavRemove:t.toggleFavAdd}
+        aria-pressed={isFav}
+        style={{position:"absolute",top:8,right:8,background:"none",border:"none",cursor:"pointer",fontSize:22,lineHeight:1,padding:0,width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}}>
         {isFav?"❤️":"🤍"}
       </button>
     </div>
@@ -494,60 +569,84 @@ function ActivityCard({activity,onClick,isFav,onToggleFav,t,lang}){
 
 function ActivityDetail({activity,isFav,onToggleFav,t,lang}){
   const tp=TYPE[activity.type];const en=ENERGY[activity.energy];
-  const [copied,setCopied]=useState(false);
 
-  const copyToClipboard=async()=>{
-    const txt=[activity.name,"",`${activity.duration} ${t.min} | ${activity.minPeople}-${activity.maxPeople} ${t.people} | ${en.label[lang]}`,`${t.materials}: ${activity.materials}`,"",activity.description,"",activity.instructions.map((s,i)=>`${i+1}. ${s}`).join("\n"),"",activity.facilScript,"",activity.facilTip,"",activity.outcome,"","— Facilitation Toolkit"].join("\n");
-    try{await navigator.clipboard.writeText(txt);}catch(e){const ta=document.createElement("textarea");ta.value=txt;ta.style.cssText="position:fixed;opacity:0;top:0;left:0;";document.body.appendChild(ta);ta.focus();ta.select();document.execCommand("copy");document.body.removeChild(ta);}
-    setCopied(true);setTimeout(()=>setCopied(false),2000);
-  };
-
-  const printAsPDF=()=>{
-    const content=[activity.name,"",`${activity.duration} ${t.min} | ${activity.minPeople}-${activity.maxPeople} ${t.people}`,`${t.materials}: ${activity.materials}`,"",`-- ${t.howToRun.toUpperCase()} --`,activity.instructions.map((s,i)=>`${i+1}. ${s}`).join("\n"),"",`-- ${t.facilScript.toUpperCase()} --`,activity.facilScript,"",`-- ${t.facilTip.toUpperCase()} --`,activity.facilTip,"",`-- ${t.outcome.toUpperCase()} --`,activity.outcome,"","— Facilitation Toolkit"].join("\n");
-    const ta=document.createElement("textarea");ta.value=content;ta.style.cssText="position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;font-family:monospace;font-size:13px;padding:24px;box-sizing:border-box;background:#fff;color:#000;border:none;resize:none;";
-    const closeBtn=document.createElement("button");closeBtn.innerText=t.close;closeBtn.style.cssText="position:fixed;top:16px;right:16px;z-index:10000;background:#F25A38;color:#fff;border:none;border-radius:20px;padding:8px 18px;font-size:14px;font-weight:700;cursor:pointer;";
-    const printBtn=document.createElement("button");printBtn.innerText=t.print;printBtn.style.cssText="position:fixed;top:16px;right:130px;z-index:10000;background:#42708C;color:#fff;border:none;border-radius:20px;padding:8px 18px;font-size:14px;font-weight:700;cursor:pointer;";
-    document.body.appendChild(ta);document.body.appendChild(closeBtn);document.body.appendChild(printBtn);ta.select();
-    closeBtn.onclick=()=>{document.body.removeChild(ta);document.body.removeChild(closeBtn);document.body.removeChild(printBtn);};
-    printBtn.onclick=()=>window.print();
+  const shareActivity=async()=>{
+    const txt=[
+      activity.name,
+      "",
+      `${activity.duration} ${t.min} | ${activity.minPeople}–${activity.maxPeople} ${t.people} | ${en.label[lang]}`,
+      `${t.materials}: ${activity.materials}`,
+      "",
+      activity.description,
+      "",
+      `— ${t.howToRun.toUpperCase()} —`,
+      activity.instructions.map((s,i)=>`${i+1}. ${s}`).join("\n"),
+      "",
+      `— ${t.facilScript.toUpperCase()} —`,
+      activity.facilScript,
+      "",
+      `— ${t.facilTip.toUpperCase()} —`,
+      activity.facilTip,
+      "",
+      `— ${t.outcome.toUpperCase()} —`,
+      activity.outcome,
+      "",
+      "— FaciToolkit"
+    ].join("\n");
+    if(navigator.share){
+      try{await navigator.share({title:activity.name,text:txt});}catch(e){}
+    } else {
+      try{await navigator.clipboard.writeText(txt);}catch(e){
+        const ta=document.createElement("textarea");ta.value=txt;ta.style.cssText="position:fixed;opacity:0;top:0;left:0;";
+        document.body.appendChild(ta);ta.focus();ta.select();document.execCommand("copy");document.body.removeChild(ta);
+      }
+    }
   };
 
   return(
     <div style={{paddingTop:28}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
         <span style={{background:tp.bg,border:`1px solid ${tp.color}40`,color:tp.color,borderRadius:20,padding:"4px 14px",fontSize:12,fontWeight:800}}>{TYPE_LABEL[lang][activity.type]}</span>
-        <button onClick={onToggleFav} style={{background:"none",border:"none",cursor:"pointer",fontSize:24,padding:4}} className="no-print">{isFav?"❤️":"🤍"}</button>
+        <button
+          onClick={onToggleFav}
+          aria-label={isFav?t.toggleFavRemove:t.toggleFavAdd}
+          aria-pressed={isFav}
+          style={{background:"none",border:"none",cursor:"pointer",fontSize:24,padding:0,width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center"}}
+          className="no-print">
+          {isFav?"❤️":"🤍"}
+        </button>
       </div>
-      <h1 style={{margin:"0 0 8px",fontSize:24,fontWeight:900,lineHeight:1.2}}>{activity.name}</h1>
-      <p style={{margin:"0 0 20px",color:C.mid,fontSize:14,lineHeight:1.65}}>{activity.description}</p>
+      <h1 style={{margin:"0 0 8px",fontSize:24,fontWeight:900,lineHeight:1.3}}>{activity.name}</h1>
+      <p style={{margin:"0 0 20px",color:C.mid,fontSize:16,lineHeight:1.6}}>{activity.description}</p>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:24}}>
         {[{icon:"⏱",label:`${activity.duration} ${t.min}`},{icon:"👥",label:`${activity.minPeople}–${activity.maxPeople} ${t.people}`},{icon:en.emoji,label:en.label[lang],color:en.color,bg:en.color+"12"},{icon:"🎒",label:activity.materials}].map((c,i)=>(
-          <div key={i} style={{background:c.bg||C.cream,border:`1px solid ${(c.color||C.border)}30`,borderRadius:12,padding:"8px 12px",fontSize:12,color:c.color||C.mid,display:"flex",alignItems:"center",gap:6,fontWeight:600}}>{c.icon} {c.label}</div>
+          <div key={i} style={{background:c.bg||C.cream,border:`1px solid ${(c.color||C.border)}30`,borderRadius:12,padding:"8px 12px",fontSize:13,color:c.color||C.mid,display:"flex",alignItems:"center",gap:6,fontWeight:600}}>{c.icon} {c.label}</div>
         ))}
         {activity.space.map(s=>(
-          <div key={s} style={{background:C.cream,border:`1px solid ${C.border}`,borderRadius:12,padding:"8px 12px",fontSize:12,color:C.mid,display:"flex",alignItems:"center",gap:6,fontWeight:600}}>{SPACE_META[lang][s].emoji} {SPACE_META[lang][s].label}</div>
+          <div key={s} style={{background:C.cream,border:`1px solid ${C.border}`,borderRadius:12,padding:"8px 12px",fontSize:13,color:C.mid,display:"flex",alignItems:"center",gap:6,fontWeight:600}}>{SPACE_META[lang][s].emoji} {SPACE_META[lang][s].label}</div>
         ))}
       </div>
-      <div className="no-print" style={{display:"flex",gap:10,marginBottom:28}}>
-        <button onClick={copyToClipboard} style={{flex:1,background:copied?"#dce8ef":"#fff",border:`1.5px solid ${copied?C.teal:C.border}`,borderRadius:12,padding:"11px 16px",cursor:"pointer",fontSize:13,fontWeight:700,color:copied?C.teal:C.mid,transition:"all 0.2s"}}>{copied?t.copied:t.copy}</button>
-        <button onClick={printAsPDF} style={{flex:1,background:"#fff",border:`1.5px solid ${C.border}`,borderRadius:12,padding:"11px 16px",cursor:"pointer",fontSize:13,fontWeight:700,color:C.mid}}>{t.savePDF}</button>
+      <div className="no-print" style={{marginBottom:28}}>
+        <button onClick={shareActivity} style={{width:"100%",background:"#fff",border:`1.5px solid ${C.border}`,borderRadius:12,padding:"13px 16px",cursor:"pointer",fontSize:15,fontWeight:700,color:C.mid,display:"flex",alignItems:"center",justifyContent:"center",gap:8,minHeight:44}}>
+          <span aria-hidden="true" style={{fontSize:16}}>📤</span> {t.share}
+        </button>
       </div>
       <Section title={t.howToRun}>
         {activity.instructions.map((s,i)=>(
           <div key={i} style={{display:"flex",gap:14,marginBottom:16}}>
-            <div style={{minWidth:28,height:28,borderRadius:"50%",background:tp.color,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,flexShrink:0}}>{i+1}</div>
-            <div style={{color:C.mid,fontSize:14,lineHeight:1.65,paddingTop:4}}>{s}</div>
+            <div aria-hidden="true" style={{minWidth:28,height:28,borderRadius:"50%",background:tp.color,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,flexShrink:0}}>{i+1}</div>
+            <div style={{color:C.mid,fontSize:15,lineHeight:1.65,paddingTop:4}}>{s}</div>
           </div>
         ))}
       </Section>
       <Section title={t.facilScript}>
-        <div style={{background:"#fef9f0",border:`1.5px solid ${C.border}`,borderLeft:"4px solid #8C6746",borderRadius:"0 12px 12px 0",padding:"14px 18px",fontSize:14,color:C.mid,lineHeight:1.8,fontStyle:"italic"}}>🎤 {activity.facilScript}</div>
+        <div style={{background:"#fef9f0",border:`1.5px solid ${C.border}`,borderLeft:"4px solid #8C6746",borderRadius:"0 12px 12px 0",padding:"14px 18px",fontSize:15,color:C.mid,lineHeight:1.7,fontStyle:"italic"}}>🎤 {activity.facilScript}</div>
       </Section>
       <Section title={t.facilTip}>
-        <div style={{background:tp.lightBg,border:`1.5px solid ${tp.color}30`,borderLeft:`4px solid ${tp.color}`,borderRadius:"0 12px 12px 0",padding:"14px 18px",fontSize:14,color:C.mid,lineHeight:1.65}}>💡 {activity.facilTip}</div>
+        <div style={{background:tp.lightBg,border:`1.5px solid ${tp.color}30`,borderLeft:`4px solid ${tp.color}`,borderRadius:"0 12px 12px 0",padding:"14px 18px",fontSize:15,color:C.mid,lineHeight:1.65}}>💡 {activity.facilTip}</div>
       </Section>
       <Section title={t.outcome}>
-        <div style={{background:C.cream,border:`1.5px solid ${C.border}`,borderLeft:`4px solid ${C.teal}`,borderRadius:"0 12px 12px 0",padding:"14px 18px",fontSize:14,color:C.mid,lineHeight:1.65}}>✨ {activity.outcome}</div>
+        <div style={{background:C.cream,border:`1.5px solid ${C.border}`,borderLeft:`4px solid ${C.teal}`,borderRadius:"0 12px 12px 0",padding:"14px 18px",fontSize:15,color:C.mid,lineHeight:1.65}}>✨ {activity.outcome}</div>
       </Section>
     </div>
   );
@@ -560,9 +659,9 @@ function Section({title,children}){
 function EmptyState({onRetry,t}){
   return(
     <div style={{textAlign:"center",padding:"48px 0",color:C.muted}}>
-      <div style={{fontSize:44,marginBottom:14}}>🔍</div>
-      <p style={{margin:"0 0 20px",fontSize:15}}>{t.noMatch}</p>
-      <button onClick={onRetry} style={{background:C.red,border:"none",color:"#fff",borderRadius:20,padding:"11px 24px",cursor:"pointer",fontSize:14,fontWeight:800}}>{t.adjustBtn}</button>
+      <div aria-hidden="true" style={{fontSize:44,marginBottom:14}}>🔍</div>
+      <p style={{margin:"0 0 20px",fontSize:16,lineHeight:1.5}}>{t.noMatch}</p>
+      <button onClick={onRetry} style={{background:C.red,border:"none",color:"#fff",borderRadius:20,padding:"13px 24px",cursor:"pointer",fontSize:15,fontWeight:800,minHeight:44}}>{t.adjustBtn}</button>
     </div>
   );
 }
